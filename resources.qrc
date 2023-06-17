@@ -1,0 +1,12 @@
+<RCC>
+  <qresource prefix="icon">
+    <file>icons/alert-128.ico</file>
+    <file>icons/Clicked.ico</file>
+    <file>icons/line-128.ico</file>
+    <file>icons/menu-4-128.ico</file>
+    <file>icons/popcorn-128.ico</file>
+    <file>icons/webClicked.ico</file>
+    <file>icons/website-optimization-2-128 (4).ico</file>
+    <file>icons/x-mark-5-128 (1).ico</file>
+  </qresource>
+</RCC>
