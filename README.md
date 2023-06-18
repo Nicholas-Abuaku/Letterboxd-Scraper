@@ -7,6 +7,7 @@
 - Pandas
 - Transformers
 - scipy
+
 <br>
 
 Scrapes letterboxd reviews and performs sentiment analysis 
