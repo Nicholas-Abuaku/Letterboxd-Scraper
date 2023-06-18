@@ -1,6 +1,7 @@
 # LetterboxdSentiScrape
 <br>
-## Dependencies
+
+# Dependencies
 - PyQt6
 - BeautifulSoup4
 - Pandas
