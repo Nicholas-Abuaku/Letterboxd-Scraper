@@ -7,6 +7,8 @@
 - Pandas
 - Transformers
 - scipy
+- Requests
+- CSV
 
 <br>
 
