@@ -1,13 +1,18 @@
 from bs4 import BeautifulSoup
 import requests
+from PyQt6.QtCore import QThread, pyqtSignal
 import csv
-import pandas as pd
 
 
 
-class ReviewScraper:
-    def __init__(self, url):
+class ReviewScraper(QThread):
+    scrapingComplete = pyqtSignal()
+    scrapingProgress = pyqtSignal(int)
+
+    def __init__(self, url, desired_comments):
+        super().__init__()
         self.url = url
+        self.desired_comments = desired_comments
         self.file = None
         self.writer = None
     
@@ -22,7 +27,7 @@ class ReviewScraper:
         if self.file:
             self.file.close()
 
-    def scrape_reviews(self, desired_comments):
+    def run(self):
         id_list = [] 
         review_list = []
         desired_comments = 500
@@ -31,6 +36,8 @@ class ReviewScraper:
         comments_count = 0
 
         while comments_count < desired_comments:
+            if "https://" not in self.url:
+                self.url = "https://"+self.url
             url_with_page = f"{self.url}/page/{page_number}"
             page_to_scrape = requests.get(url_with_page)
             soup = BeautifulSoup(page_to_scrape.text, "html.parser")
@@ -40,6 +47,8 @@ class ReviewScraper:
                 print(review.text)
                 id_list.append(comments_count + 1)
                 review_list.append(review.text.strip())  # Write each review as a separate row
+                progress = int((comments_count/desired_comments)*(100))
+                self.scrapingProgress.emit(progress)
                 
                 comments_count += 1
                 
@@ -57,11 +66,8 @@ class ReviewScraper:
         
         self.writer.writerows(zip(id_list, review_list))
         self.close_file()
-
-
-if __name__ == "__main__":
-    scraper = ReviewScraper("https://letterboxd.com/film/about-time/reviews/")
-    scraper.scrape_reviews(500)
-   # df = pd.read_csv('Letterboxd_scraped_reviews.csv')
-    #print(df.shape[0])
+        self.scrapingComplete.emit()
     
+
+
+

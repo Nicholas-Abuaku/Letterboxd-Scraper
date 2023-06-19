@@ -1,8 +1,10 @@
 import pandas as pd
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
+from PyQt6.QtCore import QThread, pyqtSignal
 from scipy.special import softmax
 
-class sentimentAnalyser():
+class sentimentAnalyser(QThread):
+    analysisComplete = pyqtSignal()
     def __init__(self, file):
         MODEL = "cardiffnlp/twitter-roberta-base-sentiment"
         self.tokenizer = AutoTokenizer.from_pretrained(MODEL)
@@ -20,8 +22,9 @@ class sentimentAnalyser():
         scores = output.logits[0].detach().numpy()
         scores = softmax(scores)
         scores_dict = {
-            'roberta_neg': scores[0],
-            'roberta_neu': scores[1],
-            'roberta_pos': scores[2]
+            'Negative': scores[0],
+            'Neutral': scores[1],
+            'Positive': scores[2]
         }
         return scores_dict
+    

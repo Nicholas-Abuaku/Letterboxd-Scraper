@@ -1,6 +1,6 @@
 import sys
-from PyQt6.QtWidgets import QMainWindow, QApplication, QPushButton, QFileDialog,QTableWidgetItem, QHeaderView
-from PyQt6.QtCore import pyqtSlot, QFile, QTextStream, pyqtSignal, Qt
+from PyQt6.QtWidgets import QMainWindow, QApplication, QPushButton, QFileDialog,QTableWidgetItem, QHeaderView, QProgressBar
+from PyQt6.QtCore import pyqtSlot, QFile, QTextStream, pyqtSignal, Qt, QThread
 from SentiScraper import Ui_MainWindow
 import resources
 from webScraper import ReviewScraper
@@ -8,8 +8,41 @@ from sentimentAnalyser import sentimentAnalyser
 import pandas as pd
 res = {}
 results_df = []
+
+class SentimentThread(QThread):
+    sentimentComplete = pyqtSignal()
+    sentimentProgress = pyqtSignal(int)
+    def __init__(self, pathToCSV):
+        super().__init__()
+        self.pathToCSV = pathToCSV
+    
+    def run(self):
+        print("Running")
+        global results_df
+        sentAnalayser = sentimentAnalyser(self.pathToCSV)
+        total_rows = sentAnalayser.df.shape[0]
+        progress_step = 100/total_rows
+        progress = 0
+        for i, row in sentAnalayser.df.iterrows():
+            try:
+                text = row['Reviews']
+                myid = row['ID']
+                roberta_results = sentAnalayser.polarity_scores_roberta(text)
+                res[myid] = roberta_results
+                self.sentimentProgress.emit(int(progress))
+                progress += progress_step
+            except RuntimeError:
+                print("An error has occured in row:",i)
+        results_df = pd.DataFrame(res).T
+        results_df['ID'] = results_df.index
+        results_df = results_df.merge(sentAnalayser.df,how='left')  
+        results_df = results_df.drop('ID', axis=1)
+        self.sentimentProgress.emit(100)
+    
+
 class MainWindow(QMainWindow):
-    progressUpdate = pyqtSignal(int)
+    scraperProgressUpdate = pyqtSignal(int)
+    sentimentProgress = pyqtSignal(int)
     def __init__(self):
         super(MainWindow,self).__init__()
         self.ui = Ui_MainWindow()
@@ -19,12 +52,11 @@ class MainWindow(QMainWindow):
         self.ui.beginScrapeButton.clicked.connect(self.startScraper)
         self.ui.openCSV.clicked.connect(self.browseFiles)
         self.ui.exportResultsButton.clicked.connect(self.exportResults)
-        self.ui.analyzeButton.clicked.connect(self.runSentiment)
+        self.ui.analyzeButton.clicked.connect(self.runSentimentThread)
+    
+        self.scraper = None
         self.ui.viewAllReviews.clicked.connect(self.viewComments)
-        
-    
 
-    
     def on_stackedWidget_currentChanged(self,index):
         buttonList = self.ui.menuBar.findChildren(QPushButton)
 
@@ -45,9 +77,19 @@ class MainWindow(QMainWindow):
     
     def startScraper(self):
         url = self.ui.lineEdit.text()
-        scraper = ReviewScraper(url)
         maxComments = 500
-        scraper.scrape_reviews(500)
+        self.scraper = ReviewScraper(url,maxComments)
+        self.scraper.scrapingComplete.connect(self.onScrapingComplete)
+        self.scraper.scrapingProgress.connect(self.onScrapingProgress)
+        self.scraper.start()
+    
+    def onScrapingComplete(self):
+        print("Scraping complete...")
+        self.ui.scrapeProgressBar.setValue(100)
+        self.scraper.terminate()
+    
+    def onScrapingProgress(self, progress):
+        self.ui.scrapeProgressBar.setValue(progress)
 
     
     def viewComments(self):
@@ -72,32 +114,19 @@ class MainWindow(QMainWindow):
         fname = QFileDialog.getOpenFileName(self, 'Open File','C:\\Users','CSV Files (*.csv)')
         self.ui.pathToCSV.setText(fname[0])
     
-    def runSentiment(self):
-        global results_df
-        sA = sentimentAnalyser(self.ui.pathToCSV.text())
-        for i, row in sA.df.iterrows():
-            try:
-                text = row['Reviews']
-                myid = row['ID']
-                roberta_results = sA.polarity_scores_roberta(text)
-                res[myid] = roberta_results
-                
-                results_df = pd.DataFrame(res).T
-                results_df['ID'] = results_df.index
-                results_df = results_df.merge(sA.df,how='left')  
-            except RuntimeError:
-                print("An error has occured")
-    
+
+
+    @pyqtSlot(int)
+    def updateSentimentProgressBar(self, progress):
+        self.ui.sentimentProgressBar.setValue(progress)
+
+    def runSentimentThread(self):
+        self.thread = SentimentThread(self.ui.pathToCSV.text())
+        self.thread.sentimentProgress.connect(self.updateSentimentProgressBar)
+        self.thread.start()
+
     def exportResults(self):
         results_df.to_csv('results.csv',index=False)
-        
-        
-
-
-    
-
-    
-
 
 if __name__=="__main__":
     app =  QApplication(sys.argv)
