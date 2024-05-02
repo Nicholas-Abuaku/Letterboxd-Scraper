@@ -1,4 +1,4 @@
-# LetterboxdSentiScrape
+# Letterboxd Review Scraper + Sentiment Analysis
 <br>
 
 # Dependencies
